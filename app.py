@@ -183,18 +183,10 @@ def update_rule(flag_name):
     if not data:
         return jsonify({"error": "Corpo da requisição obrigatório"}), 400
 
-    fields = []
-    values = []
+    rules_in_data = "rules" in data
+    is_enabled_in_data = "is_enabled" in data
 
-    if "rules" in data:
-        fields.append("rules = %s")
-        values.append(Json(data["rules"]))
-
-    if "is_enabled" in data:
-        fields.append("is_enabled = %s")
-        values.append(data["is_enabled"])
-
-    if not fields:
+    if not rules_in_data and not is_enabled_in_data:
         return (
             jsonify(
                 {
@@ -207,19 +199,34 @@ def update_rule(flag_name):
             400,
         )
 
-    values.append(flag_name)
-
-    query = (
-        f"UPDATE targeting_rules SET {', '.join(fields)} "
-        "WHERE flag_name = %s RETURNING *"
-    )  # nosec B608
+    if rules_in_data and is_enabled_in_data:
+        query = (
+            "UPDATE targeting_rules "
+            "SET rules = %s, is_enabled = %s, updated_at = NOW() "
+            "WHERE flag_name = %s RETURNING *"
+        )
+        values = (Json(data["rules"]), data["is_enabled"], flag_name)
+    elif rules_in_data:
+        query = (
+            "UPDATE targeting_rules "
+            "SET rules = %s, updated_at = NOW() "
+            "WHERE flag_name = %s RETURNING *"
+        )
+        values = (Json(data["rules"]), flag_name)
+    else:
+        query = (
+            "UPDATE targeting_rules "
+            "SET is_enabled = %s, updated_at = NOW() "
+            "WHERE flag_name = %s RETURNING *"
+        )
+        values = (data["is_enabled"], flag_name)
 
     conn = None
     cur = None
     try:
         conn = pool.getconn()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(query, tuple(values))
+        cur.execute(query, values)
 
         if cur.rowcount == 0:
             return jsonify({"error": "Regra não encontrada"}), 404
@@ -241,7 +248,6 @@ def update_rule(flag_name):
             cur.close()
         if conn:
             pool.putconn(conn)
-
 
 @app.route("/rules/<string:flag_name>", methods=["DELETE"])
 @require_auth
