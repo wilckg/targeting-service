@@ -249,6 +249,7 @@ def update_rule(flag_name):
         if conn:
             pool.putconn(conn)
 
+
 @app.route("/rules/<string:flag_name>", methods=["DELETE"])
 @require_auth
 def delete_rule(flag_name):
