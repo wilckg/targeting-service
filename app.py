@@ -212,7 +212,7 @@ def update_rule(flag_name):
     query = (
         f"UPDATE targeting_rules SET {', '.join(fields)} "
         "WHERE flag_name = %s RETURNING *"
-    ) # nosec B608
+    )  # nosec B608
 
     conn = None
     cur = None
