@@ -10,6 +10,15 @@ from flask import Flask, jsonify, request
 from psycopg2.extras import Json, RealDictCursor
 from psycopg2.pool import SimpleConnectionPool
 
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
 # Configura o logging
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -18,6 +27,19 @@ log = logging.getLogger(__name__)
 load_dotenv()
 
 app = Flask(__name__)
+
+# --- OpenTelemetry ---
+resource = Resource.create({"service.name": "targeting-service"})
+
+trace.set_tracer_provider(TracerProvider(resource=resource))
+
+otlp_exporter = OTLPSpanExporter()
+span_processor = BatchSpanProcessor(otlp_exporter)
+trace.get_tracer_provider().add_span_processor(span_processor)
+
+FlaskInstrumentor().instrument_app(app)
+RequestsInstrumentor().instrument()
+Psycopg2Instrumentor().instrument()
 
 # --- Configuração ---
 DATABASE_URL = os.getenv("DATABASE_URL")
